@@ -1,0 +1,244 @@
+<apex:component >
+       
+        <apex:slds />
+        <script type="text/javascript">
+            var __sfdcSessionId = '{!GETSESSIONID()}';
+        </script>
+        
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
+        <script src="/soap/ajax/35.0/connection.js" type="text/javascript"></script>
+        <script src="/soap/ajax/35.0/apex.js" type="text/javascript"></script>
+        <script>
+        var ParentId='';
+         var filesArray = [];
+            // ======= Fetch Files =======
+            function fetchFiles(files,posIndex) {
+               
+               posIndex--;
+               if(filesArray[posIndex]==undefined){
+                    filesArray.push(files[0]);
+               }else{
+                   filesArray.splice(posIndex,1,files[0]);
+               }
+             
+            }
+    
+            // ==== Save to Server ====
+            function saveToServer(pId) {
+               
+               //Delete Old Records
+               deloldRecords(pId);
+               
+               ParentId=pId;
+               
+                if(filesArray.length > 0) {
+                    var flag;
+                    flag = checkingFileSize();
+                    if(flag == true) {
+                       fillListOfAtc();
+                    }
+                }else{
+                    $("#errMsgFileUpload").html('There are not any file to upload.');
+                    document.getElementById('isErrMsgFileUpload').style="display:";
+                    setTimeout(function(){
+                         document.getElementById('isErrMsgFileUpload').style="display:none";
+                    }, 5000);
+                }
+            }
+            
+            // ==== Checking file size ====
+            function checkingFileSize(){
+                var allFilesSize = 0;
+                var flag = true;
+                for(var i=0 ; i<filesArray.length ; i++) {
+                    var fileSize = 0;
+                    fileSize = ((filesArray[i].size/1024)/1024).toFixed(2);
+                    if(fileSize > 25){
+                       
+                        flag = false;
+                         $("#errMsgFileUpload").html('The File ' + filesArray[i].name+ ' size is ' + fileSize + ' MB. Maximum single file size should be 25 MB.');
+                            document.getElementById('isErrMsgFileUpload').style="display:";
+                            setTimeout(function(){
+                                 document.getElementById('isErrMsgFileUpload').style="display:none";
+                            }, 5000);
+                        break;
+                    }
+                }
+                return flag;
+            } 
+           
+            
+            // ===== Files upload to server =====
+            var attachments = [];
+            var loadedFilesCounter = 0;
+            function fillListOfAtc() {
+                for(var i=0 ; i<filesArray.length ; i++) {
+                    var f = filesArray[i];
+                    var reader = new FileReader(); 
+                    reader.file = f;
+                    reader.onload = function(e) {
+                        var atc = new sforce.SObject("Attachment");
+                        atc.Name = this.file.name;
+                        atc.ContentType = this.file.type;
+                        atc.parentId = ParentId;
+                        var binary = "";
+                        var bytes = new Uint8Array(e.target.result);
+                        var length = bytes.byteLength;
+        
+                        for (var index = 0; index < length; index++) {
+                            binary += String.fromCharCode(bytes[index]);
+                        }
+                        atc.Body = (new sforce.Base64Binary(binary)).toString();  
+                        attachments.push(atc); 
+                    }
+                    
+                    reader.onloadend = function(e) {
+                        loadedFilesCounter++;                    
+                        if(loadedFilesCounter == filesArray.length){                               
+                            processEachAtch();
+                        } 
+                    };                        
+                    reader.readAsArrayBuffer(f);
+                } 
+                // ===END:for ====
+            }
+            
+            // ===== Process each attachment ======
+            function processEachAtch() {
+               
+                for(var i=0 ; i<attachments.length ; i++) {
+                    uploadFileToServer(attachments[i], i+1);
+                }
+            }
+            
+            //====== Upload file to server =======
+            var uploadedAtchIds = '';
+            //var parentIds = '';
+            var comma = '';
+            function uploadFileToServer(atc, flagSize) {
+        
+                document.getElementById('isFileUploadSpi').style="display:"
+                sforce.connection.create([atc], { 
+                   onSuccess : function(result, source) {                             
+                        if (result[0].getBoolean("success")){
+                            uploadedAtchIds += comma + result[0].id;
+                            comma = '---';
+                            
+                             var objImg=$(".uploadImagesFields")[flagSize-1];
+                            
+                             $(objImg).attr('src','data:image/jpeg;base64,'+atc['Body']);
+                           
+                            if(flagSize == attachments.length){ 
+                               document.getElementById('isFileUploadSpi').style="display:none";
+
+                                document.getElementById('isSuccessFileUpload').style="display:";
+                                
+                                $("#errSuccessFileUpload").html('Sucessfully Save');
+                                
+                                while(attachments.length > 0) {
+                                    attachments.pop();
+                                }
+                                
+                                setTimeout(function(){
+                                     document.getElementById('isSuccessFileUpload').style="display:none";
+                                }, 5000);
+                                
+                                loadedFilesCounter = 0;
+                            }                                 
+                        } else {
+                            document.getElementById('isFileUploadSpi').style="display:none";
+                            $("#errMsgFileUpload").html(result[0].errors.message);
+                            document.getElementById('isErrMsgFileUpload').style="display:";
+                            setTimeout(function(){
+                                 document.getElementById('isErrMsgFileUpload').style="display:none";
+                            }, 5000);
+                        }
+                    },
+                        
+                    onFailure : function(error, source) {
+                       document.getElementById('isFileUploadSpi').style="display:none"; 
+                       $("#errMsgFileUpload").html(error);
+                       document.getElementById('isErrMsgFileUpload').style="display:";
+                       setTimeout(function(){
+                                 document.getElementById('isErrMsgFileUpload').style="display:none";
+                       }, 5000);
+                    }            
+                });
+                
+                 
+            }
+            
+            function hideErrMsg(){
+                 document.getElementById('isErrMsgFileUpload').style="display:none";
+            }
+            function hideSuccMsg(){
+                 document.getElementById('isSuccessFileUpload').style="display:none";
+            }
+            
+            //Delete Records 
+            function deloldRecords(parentid){
+                var querydel="Select id from Attachment where parentId='"+parentid+"'";
+                var delArr=[];  
+                var result = sforce.connection.query(querydel, {
+                  onSuccess : function(result) {
+                     var records = result.getArray("records");
+            
+                     for (var i=0; i<records.length; i++) {
+                       var record = records[i];
+                       delArr.push(record.Id);
+                     }
+                     if(records.length>0){
+                        sforce.connection.deleteIds(delArr);
+                     }
+                  },
+                  onFailure : function(error) {
+                    
+                  }
+              });
+            }
+            
+          
+        </script>
+        <div class="slds-spinner_container" style="display:none" id="isFileUploadSpi">
+          <div role="status" class="slds-spinner slds-spinner--medium">
+            <span class="slds-assistive-text">Loading</span>
+            <div class="slds-spinner__dot-a"></div>
+            <div class="slds-spinner__dot-b"></div>
+          </div>
+        </div>
+        
+        <!--Err Msg --->
+        <div class="slds-notify_container" style="display:none" id="isErrMsgFileUpload">
+          <div class="slds-notify slds-notify--alert slds-theme--error slds-theme--alert-texture" role="alert">
+            <button class="slds-button slds-notify__close slds-button--icon-inverse" title="Close" onclick="hideErrMsg()">
+              <svg class="slds-button__icon" aria-hidden="true">
+                <use xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/utility-sprite/svg/symbols.svg#close')}"></use>
+              </svg>
+              <span class="slds-assistive-text">Close</span>
+            </button>
+            <span class="slds-assistive-text">Error</span>
+          <h2>
+          <svg class="slds-icon slds-icon--small slds-m-right--x-small" aria-hidden="true">
+                <use xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/utility-sprite/svg/symbols.svg#ban')}"></use>
+           
+          </svg><span id="errMsgFileUpload"></span></h2>
+        </div>
+       </div> 
+       
+       <!--Success -->
+       <div class="slds-notify_container" id="isSuccessFileUpload" style="display:none">
+          <div class="slds-notify slds-notify--alert slds-theme--success slds-theme--alert-texture" role="alert">
+            <button class="slds-button slds-notify__close slds-button--icon-inverse" title="Close" onclick="hideSuccMsg()">
+              <svg class="slds-button__icon" aria-hidden="true">
+                <use xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/utility-sprite/svg/symbols.svg#close')}"></use>
+              </svg>
+              <span class="slds-assistive-text">Close</span>
+            </button>
+            <span class="slds-assistive-text">Success</span>
+            <h2>
+              <svg class="slds-icon slds-icon--small slds-m-right--x-small" aria-hidden="true">
+                 <use xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/utility-sprite/svg/symbols.svg#custom19')}"></use>
+              </svg><span id="errSuccessFileUpload"></span></h2>
+          </div>
+      </div>
+</apex:component>

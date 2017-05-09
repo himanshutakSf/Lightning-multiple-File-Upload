@@ -1,0 +1,10 @@
+<apex:page showHeader="false" >
+    <c:Lightning_Att_File_Header />
+
+    <c:Lightning_Att_File CmpId="1"/><br/>
+    <c:Lightning_Att_File CmpId="2"/>
+    <button class="btn btn-primary" onClick="saveToServer('0039000001Gf7PD'); return false;" > Upload To Server </button> 
+    
+    
+ 
+</apex:page>

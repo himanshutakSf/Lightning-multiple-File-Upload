@@ -1,0 +1,39 @@
+<apex:component >
+    
+    <apex:attribute type="String" name="CmpId"  description="Cmp Ids"/>
+    <!-- File Upload Start --->
+          <div class="slds-form-element ImgUpload" id='holder{!CmpId}'>
+          <span class="slds-form-element__label" id="file-selector-id{!CmpId}"></span>
+          <div class="slds-form-element__control">
+            <div class="slds-file-selector slds-file-selector--files">
+              <div class="slds-file-selector__dropzone">
+                <input type="file" name="file" onChange="fetchFiles(this.files,{!CmpId});"  class="slds-file-selector__input slds-assistive-text" accept="image/*" id="file-upload-input-01{!CmpId}" aria-describedby="file-selector-id{!CmpId}" />
+                <label class="slds-file-selector__body" for="file-upload-input-01{!CmpId}">
+                  <span class="slds-file-selector__button slds-button slds-button--neutral">
+                    <svg class="slds-button__icon slds-button__icon--left" aria-hidden="true">
+                      <use xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"  xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/utility-sprite/svg/symbols.svg#upload')}"></use>
+                    </svg>Upload Files</span>
+                  <span class="slds-file-selector__text slds-medium-show" >or Drop Files</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+     <img src="" class="uploadImagesFields" id='{!CmpId}' />
+    <!-- File Upload End --->
+
+    <script>
+        var holder = document.getElementById('holder{!CmpId}');
+
+        holder.ondragover = function () { 
+              return false; 
+        };
+        holder.ondragend = function () { 
+        };
+        holder.ondrop = function (e) {
+            e.preventDefault();
+            fetchFiles(e.dataTransfer.files);
+        }
+    </script>        
+</apex:component>
